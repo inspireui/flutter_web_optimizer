@@ -82,7 +82,7 @@ class OptimizeCommand extends Command<void> {
 
   @override
   FutureOr<void> run() async {
-    Logger.info('start web optimize');
+    Logger.info('start web optimize inspireui');
 
     await _initIsolate(argResults!.arguments);
 
@@ -268,102 +268,37 @@ class OptimizeCommand extends Command<void> {
 
   /// 资源hash化
   void _hashAssets() {
-    /// 替换
-    String replace(
-      Match match,
-      File file,
-      String key,
-      Map<String, String> hashFiles,
-    ) {
-      // 文件名使用hash值
-      final String filename = _md5File(file);
-      final String dirname = path.dirname(key);
-      final String newKey = path.join(dirname, filename);
-
-      // hash文件路径
-      final String newPath = path.join(path.dirname(file.path), filename);
-      hashFiles[file.path] = newPath;
-
-      return '${match[1]}$newKey${match[3]}';
-    }
-
-    // 读取资源清单文件
-    final File assetManifest = File('$_webOutput/assets/AssetManifest.json');
-    String assetManifestContent = assetManifest.readAsStringSync();
-    // 读取字体清单文件
-    final File fontManifest = File('$_webOutput/assets/FontManifest.json');
-    String fontManifestContent = fontManifest.readAsStringSync();
-
     // 需要hash的文件
     final Map<String, String> hashFiles = <String, String>{};
 
     // 遍历构建产物assets目录，对资源文件md5后获取哈希值，并修改资源、字体清单文件
-    final Directory assetsDir = Directory(path.join(_webOutput, 'assets'));
-    assetsDir
-        .listSync(recursive: true)
-        .whereType<File>() // 文件类型
-        .where((File file) => !path.basename(file.path).startsWith('.'))
-        .forEach((File file) {
-      final String key = path.relative(file.path, from: assetsDir.path);
-      // 替换资源清单文件
-      assetManifestContent = assetManifestContent.replaceAllMapped(
-        RegExp('(.*)($key)(.*)'),
-        (Match match) => replace(match, file, key, hashFiles),
-      );
-      // 替换字体清单文件
-      fontManifestContent = fontManifestContent.replaceAllMapped(
-        RegExp('(.*)($key)(.*)'),
-        (Match match) => replace(match, file, key, hashFiles),
-      );
-    });
+    // final Directory assetsDir = Directory(path.join(_webOutput, 'assets'));
+    // assetsDir
+    //     .listSync(recursive: true)
+    //     .whereType<File>() // 文件类型
+    //     .where((File file) => !path.basename(file.path).startsWith('.'))
+    //     .forEach((File file) {
+    //   final String key = path.relative(file.path, from: assetsDir.path);
+    //   if (!key.startsWith('package')) {
+    //     _toUploadFiles.add(file.path);
+    //     _jsManifest[path.basename(file.path)] = path.basename(file.path);
+    //   }
+    // });
 
-    // 写入修改后的资源、字体清单文件
-    assetManifest.writeAsStringSync(assetManifestContent);
-    fontManifest.writeAsStringSync(fontManifestContent);
-
-    // 将AssetManifest.json文件进行md5
-    String assetManifestFileName = 'AssetManifest.json';
-    final File assetManifestFile =
-        File(path.join(_webOutput, 'assets', assetManifestFileName));
-    assetManifestFileName = _md5File(assetManifestFile);
-    hashFiles[assetManifestFile.path] =
-        path.join(path.dirname(assetManifestFile.path), assetManifestFileName);
-
-    // 将FontManifest.json进行md5
-    String fontManifestFileName = 'FontManifest.json';
-    final File fontManifestFile =
-        File(path.join(_webOutput, 'assets', fontManifestFileName));
-    fontManifestFileName = _md5File(fontManifestFile);
-    hashFiles[fontManifestFile.path] =
-        path.join(path.dirname(fontManifestFile.path), fontManifestFileName);
-
-    // 遍历构建产物根目录
     Directory(_webOutput)
         .listSync()
         .whereType<File>() // 文件类型
         .where(
             (File file) => RegExp(r'main\.dart(.*)\.js$').hasMatch(file.path))
         .forEach((File file) {
-      // 修正源码引用AssetManifest.json和FontManifest.json文件
-      String contents = file
-          .readAsStringSync()
-          .replaceAll(RegExp(r'AssetManifest.json'), assetManifestFileName)
-          .replaceAll(RegExp(r'FontManifest.json'), fontManifestFileName);
-      file.writeAsStringSync(contents);
+      _toUploadFiles.add(file.path);
 
-      // 替换资js文件
-      final String filename = _md5File(file);
-      hashFiles[file.path] = path.join(path.dirname(file.path), filename);
-      _jsManifest[path.basename(file.path)] = filename;
+      final String key = path.relative(file.path, from: _webOutput);
+      if (key.startsWith('main')) {
+        _jsManifest[path.basename(file.path)] = path.basename(file.path);
+      }
     });
-
-    // 重命名文件
-    hashFiles.forEach((String key, String value) {
-      File(key).renameSync(value);
-    });
-
-    // 收集需要上传的文件
-    _toUploadFiles = hashFiles.values.toList();
+    Logger.info(_toUploadFiles.length.toString());
   }
 
   /// 资源cdn化
