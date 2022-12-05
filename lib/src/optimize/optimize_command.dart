@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:args/command_runner.dart';
@@ -100,7 +101,7 @@ class OptimizeCommand extends Command<void> {
             (File entity) => path.basename(entity.path) == 'main.dart.js');
     await _splitMainDartJS(mainDartJsFile);
 
-    _hashAssets();
+    _hashScripts();
 
     await _cdnAssets();
 
@@ -255,50 +256,56 @@ class OptimizeCommand extends Command<void> {
   }
 
   /// md5文件
-  String _md5File(File file) {
+  String _md5File(File file, {String? md5}) {
     final Uint8List bytes = file.readAsBytesSync();
     // 截取8位即可
-    final md5Hash = crypto.md5.convert(bytes).toString().substring(0, 8);
+    final md5Hash = md5 ?? crypto.md5.convert(bytes).toString().substring(0, 8);
 
     // 文件名使用hash值
     final basename = path.basenameWithoutExtension(file.path);
     final extension = path.extension(file.path);
-    return '$basename.$md5Hash$extension';
+    return '$md5Hash-$basename$extension';
   }
 
-  /// 资源hash化
-  void _hashAssets() {
-    // 需要hash的文件
-    final Map<String, String> hashFiles = <String, String>{};
-
-    // 遍历构建产物assets目录，对资源文件md5后获取哈希值，并修改资源、字体清单文件
-    // final Directory assetsDir = Directory(path.join(_webOutput, 'assets'));
-    // assetsDir
-    //     .listSync(recursive: true)
-    //     .whereType<File>() // 文件类型
-    //     .where((File file) => !path.basename(file.path).startsWith('.'))
-    //     .forEach((File file) {
-    //   final String key = path.relative(file.path, from: assetsDir.path);
-    //   if (!key.startsWith('package')) {
-    //     _toUploadFiles.add(file.path);
-    //     _jsManifest[path.basename(file.path)] = path.basename(file.path);
-    //   }
-    // });
-
+  void _hashScripts() {
+    var md5 = crypto.md5
+        .convert([
+          Random().nextInt(1000),
+          Random().nextInt(1000),
+          Random().nextInt(1000),
+          Random().nextInt(1000)
+        ])
+        .toString()
+        .substring(0, 8);
+    Logger.info('hash script $md5');
     Directory(_webOutput)
         .listSync()
-        .whereType<File>() // 文件类型
+        .whereType<File>()
         .where(
             (File file) => RegExp(r'main\.dart(.*)\.js$').hasMatch(file.path))
         .forEach((File file) {
       _toUploadFiles.add(file.path);
-
       final String key = path.relative(file.path, from: _webOutput);
+      final String filename = _md5File(file, md5: md5);
+      file.renameSync(path.join(path.dirname(file.path), filename));
       if (key.startsWith('main')) {
-        _jsManifest[path.basename(file.path)] = path.basename(file.path);
+        _jsManifest[path.basename(file.path)] = filename;
       }
     });
-    Logger.info(_toUploadFiles.length.toString());
+
+    /// rewrite to main script
+    for (var mainItem in _jsManifest.keys.toList()) {
+      final File file = File('$_webOutput/${_jsManifest[mainItem]}');
+      if (file.existsSync()) {
+        String contents = file.readAsStringSync();
+        contents = contents.replaceAll(
+            RegExp(r'main.dart.js'), '$md5-main.dart.js');
+        file.writeAsString(contents);
+      } else {
+        Logger.info(file.path);
+      }
+    }
+    Logger.info('hash script done');
   }
 
   /// 资源cdn化
@@ -327,11 +334,8 @@ class OptimizeCommand extends Command<void> {
 
   /// 向 index.html 注入
   void _injectToHtml() {
-    /// 读取index.html
     final File file = File('$_webOutput/index.html');
     String contents = file.readAsStringSync();
-
-    /// flutter.js哈希化并修改index.html的 flutter.js script
     final File flutterJsFile = File('$_webOutput/flutter.js');
     final String filename = _md5File(flutterJsFile);
     flutterJsFile
@@ -340,33 +344,7 @@ class OptimizeCommand extends Command<void> {
       RegExp(r'<script src="flutter.js" defer></script>'),
       '<script src="$filename" defer></script>',
     );
-
-    /// 解析 index.html 为 Document
     final Document document = parse(contents);
-
-    /// 注入meta标签
-    final List<Element> metas = document.getElementsByTagName('meta');
-    final Element? headElement = document.head;
-    if (headElement != null) {
-      final Element meta = Element.tag('meta');
-      meta.attributes['name'] = 'assetBase';
-      meta.attributes['content'] = _assetBase;
-
-      if (metas.isNotEmpty) {
-        final Element lastMeta = metas.last;
-        lastMeta.append(Text('\n'));
-        lastMeta.append(Comment('content值必须以 / 结尾'));
-        lastMeta.append(Text('\n'));
-        lastMeta.append(meta);
-      } else {
-        headElement.append(Comment('content值必须以 / 结尾'));
-        headElement.append(Text('\n'));
-        headElement.append(meta);
-        headElement.append(Text('\n'));
-      }
-    }
-
-    /// 注入script
     final String dartDeferredLibraryLoader = dartDeferredLibraryLoaderSourceCode
         .replaceAll(
             RegExp('var assetBase = null;'), 'var assetBase = "$_assetBase";')
@@ -375,7 +353,6 @@ class OptimizeCommand extends Command<void> {
           'var jsManifest = ${jsonEncode(_jsManifest)};',
         );
     final List<Element> scripts = document.getElementsByTagName('script');
-    // 是否注入js
     bool isInjected = false;
     for (int i = 0; i < scripts.length; i++) {
       final Element element = scripts[i];
@@ -401,8 +378,6 @@ class OptimizeCommand extends Command<void> {
         }
       }
     }
-
-    // 写入文件
     file.writeAsStringSync(document.outerHtml);
   }
 }
