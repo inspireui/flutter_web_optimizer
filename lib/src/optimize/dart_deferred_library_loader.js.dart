@@ -3,17 +3,13 @@ const String dartDeferredLibraryLoaderSourceCode = r'''
     var assetBase = null;
     var jsManifest = null;
     function dartDeferredLibraryLoader(uri, successCallback, errorCallback, loadId) {
-      console.log(`uri: ${uri}, loadId: ${loadId}`);
       let src;
       try {
         const url = new URL(uri);
-        const key = url.pathname.replaceAll(/(.*)(main\.dart\..+\.js)/g, '$2');
-        src = `${assetBase}${jsManifest[key]}`;
+        src = uri;
       } catch (e) {
-        const key = uri.replaceAll(/(.*)(main\.dart\..+\.js)/g, '$2');
-        src = `${assetBase}${jsManifest[key]}`;
+        src = `${assetBase}${uri}`;
       }
-      
       script = document.createElement("script");
       script.type = "text/javascript";
       script.src = src;

@@ -13,6 +13,7 @@ import 'package:path/path.dart' as path;
 
 import '../common/logger.dart';
 import '../common/model.dart';
+import 'dart_agency_build.dart';
 import 'dart_deferred_library_loader.js.dart';
 import 'flutter.js.dart';
 
@@ -35,6 +36,10 @@ class OptimizeCommand extends Command<void> {
         help: 'plugin file path，'
             'only support relative path，root path is [path.context.current]，'
             'eq：flutter_web_optimize_plugin.dart',
+      )
+      ..addOption(
+        'target',
+        help: 'Build target'
       );
   }
 
@@ -288,7 +293,7 @@ class OptimizeCommand extends Command<void> {
       final String key = path.relative(file.path, from: _webOutput);
       final String filename = _md5File(file, md5: md5);
       file.renameSync(path.join(path.dirname(file.path), filename));
-      if (key.startsWith('main')) {
+      if (key.startsWith('main.dart_')) {
         _jsManifest[path.basename(file.path)] = filename;
       }
     });
@@ -334,6 +339,8 @@ class OptimizeCommand extends Command<void> {
 
   /// 向 index.html 注入
   void _injectToHtml() {
+    final String? target = argResults?['target'];
+    final bool isAgency = target == 'agency';
     final File file = File('$_webOutput/index.html');
     String contents = file.readAsStringSync();
     final File flutterJsFile = File('$_webOutput/flutter.js');
@@ -358,6 +365,9 @@ class OptimizeCommand extends Command<void> {
       final Element element = scripts[i];
       if (element.text.contains(RegExp(r'var serviceWorkerVersion'))) {
         element.text = '${element.text}\n$dartDeferredLibraryLoader';
+        if (isAgency) {
+          element.text = '${element.text}\n$dartAgencyBuild';
+        }
         isInjected = true;
         break;
       }
@@ -367,6 +377,9 @@ class OptimizeCommand extends Command<void> {
       if (headElement != null) {
         final Element script = Element.tag('script');
         script.text = '\n$dartDeferredLibraryLoader';
+        if (isAgency) {
+          script.text = '${script.text}\n$dartAgencyBuild';
+        }
 
         if (scripts.length > 1) {
           final Element firstScript = scripts.first;
