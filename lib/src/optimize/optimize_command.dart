@@ -224,7 +224,7 @@ class OptimizeCommand extends Command<void> {
     file
         .openSync(mode: FileMode.append)
         .writeStringSync('\n\n//@ sourceURL=main.dart.js\n');
-    const int totalChunk = 9;
+    const int totalChunk = 6;
     final Uint8List bytes = file.readAsBytesSync();
     final int chunkSize = (bytes.length / totalChunk).ceil();
     final List<Future<bool>> futures = List<Future<bool>>.generate(
