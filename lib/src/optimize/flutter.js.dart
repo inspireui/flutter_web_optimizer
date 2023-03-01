@@ -88,7 +88,7 @@ if (!_flutter) {
         if (!this._scriptLoaded) {
           this._scriptLoaded = new Promise((resolve, reject) => {
             document.getElementById('loading-content').innerHTML = 'Loading data content';
-            const promises = Object.keys(mainjsManifest).filter(key => /^main\.dart_(\d)\.js$/g.test(key)).sort().map(key => `${assetBase}${mainjsManifest[key]}`).map(this._downloadSplitJs);
+            const promises = Object.keys(mainjsManifest).filter(key => /^main\.dart_(\d)\.js.txt$/g.test(key)).sort().map(key => `${assetBase}${mainjsManifest[key]}`).map(this._downloadSplitJs);
             Promise.all(promises).then((values)=>{
               document.getElementById('loading-content').innerHTML = 'Mapping data content';
               const contents = values.join("");

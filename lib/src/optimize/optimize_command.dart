@@ -230,10 +230,10 @@ class OptimizeCommand extends Command<void> {
     final List<Future<bool>> futures = List<Future<bool>>.generate(
       totalChunk,
       (int index) {
-        _hashFiles['main.dart_$index.js'] = 'main.dart_$index.js';
+        _hashFiles['main.dart_$index.js.txt'] = 'main.dart_$index.js.txt';
         return writeSingleFile(
           file: file,
-          filename: 'main.dart_$index.js',
+          filename: 'main.dart_$index.js.txt',
           startIndex: index * chunkSize,
           endIndex: (index + 1) * chunkSize,
         );
