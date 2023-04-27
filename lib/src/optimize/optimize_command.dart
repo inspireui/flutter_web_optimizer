@@ -95,7 +95,7 @@ class OptimizeCommand extends Command<void> {
 
     _hashMainDartJs();
 
-    _removeFonts();
+    //_removeFonts();
 
     Logger.info('end web optimizes');
   }
