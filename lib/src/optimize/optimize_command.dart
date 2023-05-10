@@ -36,6 +36,11 @@ class OptimizeCommand extends Command<void> {
             'only support relative path，root path is [path.context.current]，'
             'eq：flutter_web_optimize_plugin.dart',
       )
+      ..addOption(
+        'remove-font',
+        help: 'web artifacts output dir，'
+            'eq：true',
+      )
       ..addFlag(
         'enable-pwa',
         help: 'enable PWA service worker',
@@ -58,6 +63,8 @@ class OptimizeCommand extends Command<void> {
 
   /// plugin 文件路径，支持处理资源上传cdn等操作
   late String _plugin;
+
+  late bool _removeFont;
 
   /// isolate通信，发送信息
   SendPort? _sendPort;
@@ -95,7 +102,10 @@ class OptimizeCommand extends Command<void> {
 
     _hashMainDartJs();
 
-    //_removeFonts();
+    if (_removeFont) {
+      Logger.info('remove font');
+      _removeFonts();
+    }
 
     Logger.info('end web optimizes');
   }
@@ -103,6 +113,8 @@ class OptimizeCommand extends Command<void> {
   Future<void> _parseArgs() async {
     /// 资源路径，一般是cdn地址
     _assetBase = argResults!['asset-base'] ?? '';
+    final String? removeFont = argResults!['remove-font'];
+    _removeFont = removeFont == 'true';
 
     /// Web构建产物路径
     final String? webOutput = argResults!['web-output'];
